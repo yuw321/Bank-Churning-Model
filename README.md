@@ -47,6 +47,12 @@ This project studies the attrition pattern of bank customers based on their acco
             - The mean for existing customer is 4663.694, the attrited customer is 3132.556. 
           - Avg_Utilization_Ratio
             - The mean for existing customer is 0.3039046, the attrited customer is 0.1640479.
-
+  - Question Three:
+    - Can we predict which customer is going to attrit based on this data?
+      - This question builds on the knowledge obtained from the dataset in the last two questions and tries find out the model with the best performance in terms of identifying the customers most likely to attrit. By picking out the model with the highest likelihood of identifying attrited customers, the bank will be able to have the opportunity to stop the attrition and retain those customers.
+    - Using the best six variables we have discovered in the previous section, build logistic regression, decision tree and random forest models. Evaluate the performance of each model by looking at its accuracy, sensitivity, specificity.  
+      - Discover the most important feature by evaluating the feature importance in random forest model.
+        - Using importance() function in the random forest package, the list of most important variables is obtained from the random forest model. 
+          - The finding is that total transaction amount on the account is the most important factor in terms of determining the customer’s attrition status. This means that the bank should reach out to a specific customer if their total transaction amount drops compared to the previous month, since it is the most important factor in terms of predicting attrition and very indicative of the customer’s tendency to attrit from the bank.
 
 
