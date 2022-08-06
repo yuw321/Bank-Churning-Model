@@ -1,0 +1,351 @@
+---
+title: "Bank_Churning_Model"
+output: html_notebook
+---
+
+# Load in the data
+```{r}
+setwd("Directory") # My directory where I store the data
+data = read.csv("BankChurners.csv", header = T)
+data = data[,c(1:19)]
+```
+
+# Features in the data
+```{r}
+names(data)
+```
+
+# Summary of the data
+```{r}
+summary(data)
+data_for_boxplot = scale(data[,c(3,5,10:19)])
+
+boxplot(data_for_boxplot)
+```
+
+# Question 1
+```{r}
+median_credit_limit = median(data$Credit_Limit)#find the median credit limit
+
+#create a binary field: 
+#if the credit limit of a specific instance is greater than the median credit limit, it is 1
+#if not, this is 0
+greater_than_median_Credit_Limit = rep(0,nrow(data))
+greater_than_median_Credit_Limit[data$Credit_Limit>median_credit_limit]=1
+data = data.frame(data,greater_than_median_Credit_Limit)
+
+#remove instances where income category is Unkown
+data = subset(data, data$Income_Category!="Unknown")
+
+#replace the space between words with underscore
+data$Income_Category = gsub(" ","_",data$Income_Category)
+
+#create categorical response with shorter length
+income_category_level = rep("very_low",nrow(data))
+income_category_level[data$Income_Category == "$40K_-_$60K"]= "low"
+income_category_level[data$Income_Category == "$60K_-_$80K"]= "average"
+income_category_level[data$Income_Category == "$80K_-_$120K"]= "high"	
+income_category_level[data$Income_Category == "$120K_+"]= "very_high"	
+data = data.frame(data,income_category_level)
+
+#use leaps to test all three variable selection methods
+#install.packages("leaps")
+library(leaps)
+#build a model that checks as many variables as possible with the three selection methods:
+Pre_model_forward = regsubsets(data = data,Credit_Limit ~ Customer_Age + Gender  + Dependent_count + Education_Level + Marital_Status + Income_Category + Card_Category + Months_on_book + Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Total_Revolving_Bal +Total_Trans_Amt + Avg_Utilization_Ratio,method = "forward")
+
+Pre_model_back = regsubsets(data = data,Credit_Limit ~ Customer_Age + Gender  + Dependent_count + Education_Level + Marital_Status + Income_Category + Card_Category + Months_on_book + Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Total_Revolving_Bal +Total_Trans_Amt + Avg_Utilization_Ratio,method = "backward")
+
+Pre_model_best = regsubsets(data = data,Credit_Limit ~ Customer_Age + Gender  + Dependent_count + Education_Level + Marital_Status + Income_Category + Card_Category + Months_on_book + Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Total_Revolving_Bal +Total_Trans_Amt + Avg_Utilization_Ratio)
+
+par(mfrow = c(1,3))
+plot(Pre_model_forward)
+plot(Pre_model_back)
+plot(Pre_model_best)
+par(mfrow = c(1,1))
+# Agreement between all three selection methods!
+
+summary(Pre_model_best)
+plot(Pre_model_best)
+
+# The best size six model.
+best_reg=lm(data=data, greater_than_median_Credit_Limit~ Gender + Income_Category + Card_Category + Total_Revolving_Bal + Avg_Utilization_Ratio)
+summary(best_reg)
+#adj r^2 = 0.5998 
+```
+
+```{r}
+#change reference group is gender == male, income == 60k-80k(average), and card category == silver
+library (dummies)
+gender = dummy(data$Gender)
+income = dummy(data$income_category_level)
+card = dummy(data$Card_Category)
+data = data.frame(data, gender, income, card)
+summary(data)
+
+best_reg=lm(data=data, Credit_Limit~ GenderF + income_category_levelhigh + income_category_levellow + income_category_levelvery_high + income_category_levelvery_low +  Card_CategoryBlue + Card_CategoryGold + Card_CategoryPlatinum + Total_Revolving_Bal + Avg_Utilization_Ratio)
+summary(best_reg)
+
+#Test gender and credit limit
+genderM= data.frame(head(data,1))
+genderM$GenderF= 0
+genderM$GenderM= 1
+genderM_Prob = predict(best_reg,genderM,type = "response")
+
+genderF= data.frame(genderM)
+genderF$GenderF= 1
+genderF$GenderM= 0
+genderF_Prob = predict(best_reg,genderF,type = "response")
+
+diff_gender = genderM_Prob - genderF_Prob
+diff_gender
+#55.101 
+# this means a male customer are predicted to have a credit limit $55 greater the median credit limit compared to a female customer
+
+#test Total revolving balance and credit limit: 1000 vs. 2000
+highBalance= data.frame(head(data,1))
+highBalance$Total_Revolving_Bal = 2000
+highBalance_Prob = predict(best_reg,highBalance,type = "response")
+
+lowBalance= data.frame(highBalance)
+lowBalance$Total_Revolving_Bal = 1000
+lowBalance_Prob = predict(best_reg,lowBalance,type = "response")
+
+diff_balance = highBalance_Prob - lowBalance_Prob
+diff_balance
+#3574.007 
+#this means a customer with a 2000 dollar revolving balance are predicted to have a credit limit $3574.007 greater than a customer with 1000 revolving balance
+
+#test average utilization and credit limit: 0.15 vs. 0.60
+lowUtil= data.frame(head(data,1))
+lowUtil$Avg_Utilization_Ratio = 0.15
+lowUtil_Prob = predict(best_reg,lowUtil,type = "response")
+
+highUtil= data.frame(lowUtil)
+highUtil$Avg_Utilization_Ratio = 0.60
+highUtil_Prob = predict(best_reg,highUtil,type = "response")
+
+diff_util = lowUtil_Prob - highUtil_Prob
+diff_util
+#6975.104 
+##this means a customer with a 15% average utilization ratio are predicted to have a credit limit $6975.104  greater than a customer with 60% average utilization ratio
+
+highIncome= data.frame(head(data,1))
+highIncome$income_category_levelhigh = 1
+highIncome$income_category_levellow = 0
+highIncome$income_category_levelvery_high = 0
+highIncome$income_category_levelvery_low = 0
+highIncomeProb = predict(best_reg,highIncome,type = "response")
+
+lowIncome= data.frame(highIncome)
+lowIncome$income_category_levelhigh = 0
+lowIncome$income_category_levellow = 1
+lowIncome$income_category_levelvery_high = 0
+lowIncome$income_category_levelvery_low = 0
+lowIncomeProb = predict(best_reg,lowIncome,type = "response")
+
+diff_income = highIncomeProb - lowIncomeProb
+diff_income
+#7446.837
+#this means a customer with a income between $80K-120K are predicted to have a credit limit $7446.837 greater than a customer with a income of $60K-80K
+#however, this should not be used as a customer's credit limit will undoubtedly increase as they have higher income, so it is not helpful to us in terms of discovering relationships.
+```
+
+#problem 2, understand the attrited customers
+```{r}
+
+attrited = rep(0,nrow(data))
+attrited[data$Attrition_Flag == "Attrited Customer"]=1
+data = data.frame(data,attrited)
+library(leaps)
+#build a model that checks as many variables as possible with the three selection methods:
+attrit_model_forward = regsubsets(data = data,attrited ~ Customer_Age + Gender  + Dependent_count + Education_Level + Marital_Status + Income_Category + Card_Category + Months_on_book + Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon +Credit_Limit+ Total_Revolving_Bal +Total_Trans_Amt + Avg_Utilization_Ratio,method = "forward")
+
+attrit_model_forward = regsubsets(data = data,attrited ~ Customer_Age + Gender  + Dependent_count + Education_Level + Marital_Status + Income_Category + Card_Category + Months_on_book + Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Credit_Limit + Total_Revolving_Bal +Total_Trans_Amt + Avg_Utilization_Ratio,method = "backward")
+
+attrit_model_best = regsubsets(data = data,attrited ~ Customer_Age + Gender  + Dependent_count + Education_Level + Marital_Status + Income_Category + Card_Category + Months_on_book + Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Credit_Limit + Total_Revolving_Bal +Total_Trans_Amt + Avg_Utilization_Ratio)
+
+par(mfrow = c(1,3))
+plot(attrit_model_forward)
+plot(attrit_model_forward)
+plot(attrit_model_best)
+par(mfrow = c(1,1))
+# Agreement between all three selection methods!
+
+summary(attrit_model_best)
+plot(attrit_model_best)
+
+# The best size six model.
+attrit_reg=glm(data=data, attrited~ Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Total_Revolving_Bal + Total_Trans_Amt + Avg_Utilization_Ratio)
+summary(attrit_reg)
+```
+```{r}
+#we want to do two sample t-test on all six variables and compare the mean for attrited and existing customers.
+
+qqnorm(data$Total_Relationship_Count)# not continuous, 1,2,3..., same kind of situation for the next 2
+t.test(data$Total_Relationship_Count ~ data$attrited,alternative = "two.sided",conf.level = 0.95)
+#p-value < 2.2e-16
+#95 percent confidence interval: 0.5406091 0.7184668
+# mean in group 0 mean in group 1 
+#        3.912871        3.283333 
+
+qqnorm(data$Months_Inactive_12_mon)
+t.test(data$Months_Inactive_12_mon ~ data$attrited,alternative = "two.sided",conf.level = 0.95)
+#p-value < 2.2e-16
+# 95 percent confidence interval:
+#  -0.4715098 -0.3691118
+# mean in group 0 mean in group 1 
+#        2.269967        2.690278 
+
+qqnorm(data$Contacts_Count_12_mon)
+t.test(data$Contacts_Count_12_mon ~ data$attrited,alternative = "two.sided",conf.level = 0.95)
+# p-value < 2.2e-16
+# 95 percent confidence interval:
+#  -0.6594063 -0.5365948
+# mean in group 0 mean in group 1 
+#        2.358944        2.956944 
+
+qqnorm(data$Total_Revolving_Bal) # kind of normal, but weird on the buttom
+t.test(data$Total_Revolving_Bal ~ data$attrited,alternative = "two.sided",conf.level = 0.95)
+# p-value < 2.2e-16
+# 95 percent confidence interval:
+#  539.8485 641.0664
+# mean in group 0 mean in group 1 
+#       1263.0199        672.5625 
+
+qqnorm(data$Total_Trans_Amt)#super weird
+t.test(data$Total_Trans_Amt ~ data$attrited,alternative = "two.sided",conf.level = 0.95)
+# p-value < 2.2e-16
+# 95 percent confidence interval:
+#  1385.363 1676.914
+# mean in group 0 mean in group 1 
+#        4663.694        3132.556 
+
+qqnorm(data$Avg_Utilization_Ratio) #weird
+t.test(data$Avg_Utilization_Ratio ~ data$attrited,alternative = "two.sided",conf.level = 0.95)
+# p-value < 2.2e-16
+# 95 percent confidence interval:
+#  0.1247102 0.1550030
+# mean in group 0 mean in group 1 
+#       0.3039046       0.1640479 
+
+#because all 6 variable's p-value are significant, it seems like attrited customers have fewer relationship with the bank, more inactive months in the last 12 months, more contacts with the bank in the last 12 months, lower revolving balance, lower total transaction amount and lower utilization ratio, compared to existing customer.
+```
+
+
+```{r}
+#since we want to predict n=binary event, we want to use logistic regression instead of linear regression
+attrit_log_reg = glm(data=data, attrited~ Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Total_Revolving_Bal + Total_Trans_Amt + Avg_Utilization_Ratio, family = "binomial")
+summary(attrit_log_reg)
+
+```
+
+```{r}
+#install.packages("caTools")
+library(caTools)
+# create decision tree models
+#install.packages("rpart")
+library(rpart)
+#install.packages("rpart.plot")
+library(rpart.plot)
+library(pROC)
+
+#split the dataset into training and testing dataset
+split = sample.split(data$attrited,SplitRatio = 0.65)
+training = subset(data,split == TRUE)
+testing = subset(data,split == FALSE)
+
+### Logistic regression model ###
+  #build model
+  logistic_reg_model = glm(attrited ~Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Total_Revolving_Bal + Total_Trans_Amt + Avg_Utilization_Ratio,  data = training, family = "binomial")
+  
+  predicted_probs = predict.glm(logistic_reg_model, testing, type = "response")
+  
+  #confusion matrix
+  log_confusion_matrix = table(testing$attrited,predicted_probs>0.5)
+  log_confusion_matrix
+  #   FALSE TRUE
+  # 0  2598   53
+  # 1   352  152
+  log_accuracy = (2598+152)/(2598+53+352+152)
+  log_accuracy #0.8716323
+  log_sensitivity = 152/(152+53)
+  log_sensitivity #0.7414634
+  log_specificity = 2598/(2598+352)
+  log_specificity #0.880678
+  
+  #trainging ROC
+  ROC_plot = roc(training$attrited, fitted(logistic_reg_model)) 
+  plot(ROC_plot) 
+  ROC_plot$auc # Area under the curve: 0.8175
+  
+  # Testing ROC
+  ROC_plot = roc(testing$attrited, predicted_probs)
+  plot(ROC_plot)
+  ROC_plot$auc#Area under the curve: 0.7913
+
+
+### Decision Tree model###
+  decision_tree_model = rpart(attrited ~Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Total_Revolving_Bal + Total_Trans_Amt + Avg_Utilization_Ratio, training)
+  
+  predicted_probs = predict(decision_tree_model,testing)
+  
+  #decision tree plot
+  rpart.plot(decision_tree_model)
+  
+  #confusion matrix
+  tree_confusion_matrix = table(testing$attrited,predicted_probs>0.5)
+  tree_confusion_matrix
+    #   FALSE TRUE
+    # 0  2526  125
+    # 1   169  335
+  tree_accuracy = (2526+335)/(2526+125+169+335)
+  tree_accuracy#0.9068146
+  tree_sensitivity = 335/(335+125)
+  tree_sensitivity#0.7282609
+  tree_specificity = 2526/(2526+169)
+  tree_specificity#0.9372913
+  
+  # Testing ROC
+  ROC_plot = roc(testing$attrited, predicted_probs)
+  plot(ROC_plot)
+  ROC_plot$auc#Area under the curve: 0.8763
+
+  
+### random forest model###
+  #install.packages("randomForest")
+  library(randomForest)
+  #install.packages("caret")
+  library(caret)
+  training$attrited = as.factor(training$attrited)
+  random_forest_model = randomForest(attrited ~Total_Relationship_Count + Months_Inactive_12_mon + Contacts_Count_12_mon + Total_Revolving_Bal + Total_Trans_Amt + Avg_Utilization_Ratio, data = training, proximity= TRUE)
+  
+  testing$attrited = as.factor(testing$attrited)
+  predicted_probs = predict(random_forest_model,testing)
+  
+  importance(random_forest_model)
+  #                            MeanDecreaseGini
+  # Total_Relationship_Count        153.70684
+  # Months_Inactive_12_mon           79.18817
+  # Contacts_Count_12_mon            98.18464
+  # Total_Revolving_Bal             292.26689
+  # Total_Trans_Amt                 567.93204
+  # Avg_Utilization_Ratio           199.50818
+  
+  #confusion matrix
+  confusionMatrix(predicted_probs,testing$attrited)
+#             Reference
+# Prediction    0    1
+#          0 2567  165
+#          1   84  339
+  forest_accuracy = (2567+339)/(2567+165+84+339)
+  forest_accuracy#0.9210777
+  forest_sensitivity = 339/(339+165)
+  forest_sensitivity#0.672619
+  forest_specificity = 2567/(2567+84)
+  forest_specificity#0.9683138
+  
+
+```
+
+
