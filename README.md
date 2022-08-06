@@ -25,4 +25,28 @@ This project studies the attrition pattern of bank customers based on their acco
           - The difference between high balance and low balance customers’ credit limit was $3574.01, which is a significant difference introduced by the gender variable. 
         - Does customers with a higher average utilization rate have a larger credit limit?
           - The difference between high balance and low balance customers’ credit limit was $6975.10. This is a rather surprising finding. Since customers with a higher balance will have a higher chance of default, it would make sense for the bank to give them lower credit limit. But the model shows that customers with a higher utilization tend to have a higher credit limit than a lower credit limit.
-        - Note that income was also tested using the same methodology, and the difference between someone with a high income and a low income is $7446.84. However, this number is not surprising as higher income means the individual have more sizable transactions in their life compared to an individual with a lower income. 
+        - The difference between someone with a high income and a low income is $7446.84. However, this number is not surprising as higher income means the individual have more sizable transactions in their life compared to an individual with a lower income. 
+  - Question 2
+    - What credit card usage pattern does attrit customers exhibit?
+      - This question seeks to test whether the mean of each numerical variable for attrited customers is statistically significantly different compared to the existing customers.
+        - How does the mean value of each numerical variable differ for attrited customers compared to existing customers and what are their p-values?
+          - Before investigating the difference in mean for each numerical variable, a binary variable was created for attrition. This binary variable enabled the feature selection model to find the variables with highest significance for predicting the customers’ attrition status. The six most relevant variables found using best subset, forward, and backward selection is consistent, they are: Total Relationship Count, Months Inactive 12 month, Contacts Count 12 month ,Total Revolving Balance, Total Trans Amt, Avg Utilization Ratio.
+        - The following list of variables were studied using the same set of approach:
+          - Use two-sample t-test to check if the difference between the variable of interest’s mean between the attrited customer and existing customer is statistically significant.
+          - The hypothesis is that the mean is the same for the attrited customers and the existing customers. t.test() in R with a confidence level of 0.95 was used, with numerical variable of interest explained by the attrited variable. 
+          - All of the two sample t-test yielded a p-value of 2.2e-16, the p-value shows that the null hypothesis has failed and that we can conclude the  mean between the two groups is different. 
+          - Total_Relationship_Count 
+            - The mean for existing customer is 3.912871, the attrited customer is 3.283333.
+          - Months_Inactive_12_mon
+            - The mean for existing customer is 2.269967, the attrited customer is 2.690278.
+          - Contacts_Count_12_mon
+            - The mean for existing customer is 2.358944, the attrited customer is 2.956944.
+          - Total_Revolving_Bal
+            - The mean for existing customer is 1263.0199, the attrited customer is 672.5625.
+          - Total_Trans_Amt
+            - The mean for existing customer is 4663.694, the attrited customer is 3132.556. 
+          - Avg_Utilization_Ratio
+            - The mean for existing customer is 0.3039046, the attrited customer is 0.1640479.
+
+
+
